@@ -156,6 +156,7 @@ Bookshelf.initialize = function(knex) {
 };
 
 // Finally, export `Bookshelf` to the world.
+BookshelfRelation.prototype.pivotHelpers = pivotHelpers;
 module.exports = Bookshelf;
 },{"./lib/base/events":4,"./lib/collection":8,"./lib/errors":10,"./lib/model":12,"./lib/relation":13,"inherits":"oxw+vU","knex":"+7L5HO","lodash":"K2RcUv","semver":"OpuoOF","simple-extend":"vZYVcT"}],2:[function(_dereq_,module,exports){
 // Base Collection
@@ -523,7 +524,7 @@ _.extend(ModelBase.prototype, _.omit(Backbone.Model.prototype, modelOmitted), Ev
   // Returns an object containing a shallow copy of the model attributes,
   // along with the `toJSON` value of any relations,
   // unless `{shallow: true}` is passed in the `options`.
-  // Also includes _pivot_ keys for relations unless `{omitPivot: true}` 
+  // Also includes _pivot_ keys for relations unless `{omitPivot: true}`
   // is passed in `options`.
   toJSON: function(options) {
     var attrs = _.extend({}, this.attributes);
