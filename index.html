@@ -27,7 +27,7 @@
   <div id="sidebar" class="interface">
 
     <a class="toc_title" href="#">
-      Bookshelf.js <span class="version">(0.7.7)</span>
+      Bookshelf.js <span class="version">(0.7.9)</span>
     </a>
     <ul class="toc_section">
       <li>&raquo; <a href="http://github.com/tgriesser/bookshelf">GitHub Repository</a></li>
@@ -195,7 +195,7 @@
       and has a comprehensive <a href="https://travis-ci.org/tgriesser/bookshelf">test suite</a>.
     </p>
 
-    <h2>Latest Release: 0.7.7 - <span class="small"><a href="#changelog">Change Log</a></span></h2>
+    <h2>Latest Release: 0.7.9 - <span class="small"><a href="#changelog">Change Log</a></span></h2>
 
     <p>
       Current Develop &mdash;
@@ -345,7 +345,7 @@ var bcrypt   = Promise.promisifyAll(require('bcrypt'));
 var Customer = bookshelf.Model.extend({
 
   initialize: function() {
-    this.on('saving', this.validateSave)
+    this.on('saving', this.validateSave);
   },
 
   validateSave: function() {
@@ -640,7 +640,7 @@ var Book = bookshelf.Model.extend({
     return this.hasOne(Summary);
   },
   owner: function() {
-    return this.belongsTo(Author);
+    return this.belongsTo(Owner);
   },
   pages: function() {
     return this.hasMany(Pages);
@@ -1041,13 +1041,25 @@ var Post = bookshelf.Model.extend({
 var Photo = bookshelf.Model.extend({
   tableName: 'photos',
   imageable: function() {
-    return this.morphTo('imageable', Site, Author);
+    return this.morphTo('imageable', Site, Post);
   }
 });
 </code></pre>
 
+    <p>
+      Optionally, if you wish to use column names other than the <b>name</b> suffixed with <tt>_type</tt> and <tt>_id</tt>
+      (for example, if you use a different naming convention in your database), you may specify custom <b>columnNames</b>.
+      This argument, when specified, expects an array containing the substitute <tt>_type</tt> and <tt>_id</tt> columns,
+      respectively.
+    </p>
+
+    <p>
+      Note that any custom <b>columnNames</b> must be specified on both ends of the relationship! Examples are provided
+      for each of the polymorphic relationship types individually.
+    </p>
+
     <p id="Model-morphOne">
-      <b class="header">morphOne</b><code>model.morphOne(Target, name, [morphValue])</code>
+      <b class="header">morphOne</b><code>model.morphOne(Target, name, [columnNames], [morphValue])</code>
       <br />
       The <b>morphOne</b> is used to signify a polymorphic relation with another <b>Target</b> model,
       where the <b>name</b> of the model is used to determine which database table keys are used.
@@ -1066,8 +1078,27 @@ var Site = bookshelf.Model.extend({
 });
 </code></pre>
 
+    <p>
+      And with custom columnNames:
+    </p>
+
+<pre><code>
+var Site = bookshelf.Model.extend({
+  tableName: 'sites',
+  photo: function() {
+    return this.morphOne(Photo, 'imageable', ["ImageableType", "ImageableId"]);
+  }
+});
+</code></pre>
+
+    <p>
+      Note that both <b>columnNames</b> and <b>morphValue</b> are optional arguments. How your argument is treated
+      when only one is specified, depends on the type. If your argument is an array, it will be assumed to contain
+      custom <b>columnNames</b>. If it's not, it will be assumed to indicate a <b>morphValue</b>.
+    </p>
+
     <p id="Model-morphMany">
-      <b class="header">morphMany</b><code>model.morphMany(Target, name, [morphValue])</code>
+      <b class="header">morphMany</b><code>model.morphMany(Target, name, [columnNames], [morphValue])</code>
       <br />
       The <b>morphMany</b> property is essentially the same as a morphOne, but creating a collection rather than a
       model (similar to a hasOne vs. hasMany relation). The <b>morphValue</b> may be optionally set to store/retrieve
@@ -1083,8 +1114,25 @@ var Post = bookshelf.Model.extend({
 });
 </code></pre>
 
+    <p>
+      And with custom columnNames:
+    </p>
+
+<pre><code>
+var Post = bookshelf.Model.extend({
+  tableName: 'posts',
+  photos: function() {
+    return this.morphMany(Photo, 'imageable', ["ImageableType", "ImageableId"]);
+  }
+});
+</code></pre>
+
+    <p>
+      The same argument parsing rules apply as for <b>morphOne</b>.
+    </p>
+
     <p id="Model-morphTo">
-      <b class="header">morphTo</b><code>model.morphTo(name, targets*)</code>
+      <b class="header">morphTo</b><code>model.morphTo(name, [columnNames], targets*)</code>
       <br />
       The <b>morphTo</b> relation is used to specify the inverse of the "morphOne" or "morphMany" relations,
       where the <b>targets</b> (constructors) must be passed to signify which models are the potential opposite end of the
@@ -1095,7 +1143,20 @@ var Post = bookshelf.Model.extend({
 var Photo = bookshelf.Model.extend({
   tableName: 'photos',
   imageable: function() {
-    return this.morphTo('imageable', Site, Author);
+    return this.morphTo('imageable', Site, Post);
+  }
+});
+</code></pre>
+
+    <p>
+      And with custom columnNames:
+    </p>
+
+<pre><code>
+var Photo = bookshelf.Model.extend({
+  tableName: 'photos',
+  imageable: function() {
+    return this.morphTo('imageable', ["ImageableType", "ImageableId"], Site, Post);
   }
 });
 </code></pre>
@@ -1845,7 +1906,7 @@ new Stories().fetch({
   withRelated: 'author'
 }).tap(function(stories) {
   if (req.withComments) return stories.load(['comments.tags', 'comments.author']);
-}).then(function() {
+}).then(function(stories) {
   console.log(JSON.stringify(stories));
 });
 </code></pre>
@@ -2170,7 +2231,7 @@ Bookshelf.transaction(function(t) {
 
         // Some validation could take place here.
         return new Book(info).save('shelf_id', model.id, {transacting: t});
-      }));
+      });
     });
 }).then(function(library) {
   console.log(library.related('books').pluck('title'));
@@ -2263,11 +2324,6 @@ process.stderr.on('data', function(data) {
     </p>
 
     <p>
-      If you're going to add a test, you should set <tt>$ export BOOKSHELF_DEV=1</tt> which will automatically save the
-      the outputs data from the tests into the <tt>shared/output.js</tt> file.
-    </p>
-
-    <p>
       Also note that you will have to create the appropriate database(s) for the test suite to run. For example, with mysql,
       you'll need to run the command <tt>create database bookshelf_test;</tt> in addition to exporting the correct test settings
       prior to running the test suite.
@@ -2281,6 +2337,25 @@ process.stderr.on('data', function(data) {
     </p>
 
     <h2 id="changelog">Change Log</h2>
+
+    <p>
+      <b class="header">0.7.9</b> &mdash; <small><i>Oct 28, 2014</i></small> &mdash; <a href="https://github.com/tgriesser/bookshelf/compare/0.7.8...0.7.9">Diff</a><br />
+    </p>
+    <ul>
+      <li>Fix for regression in columns / eager fetch query constraints, (#510).</li>
+    </ul>
+
+    <p>
+      <b class="header">0.7.8</b> &mdash; <small><i>Oct 28, 2014</i></small> &mdash; <a href="https://github.com/tgriesser/bookshelf/compare/0.7.7...0.7.8">Diff</a><br />
+    </p>
+    <ul>
+      <li>Timestamp <tt>created_at</tt> is now saved with any insert.</li>
+      <li>Fix for regression created by #429.</li>
+      <li>New events, <tt>attaching</tt>, <tt>attached</tt>, <tt>detaching</tt>, <tt>detached</tt> #452.</li>
+      <li>Ability to specify custom column names in morphTo, #454</li>
+      <li>Fix for stack overflow with model list as arguments, #482</li>
+      <li>Modified location of eager fetch query constraints internally.</li>
+    </ul>
 
     <p>
       <b class="header">0.7.7</b> &mdash; <small><i>July 23, 2014</i></small> &mdash; <a href="https://github.com/tgriesser/bookshelf/compare/0.7.6...0.7.7">Diff</a><br />
@@ -2694,7 +2769,7 @@ user.fetch({withRelated: ['accounts', {
   <script src="/docs/assets/highlight.min.js"></script>
   <script src="docs/assets/ga.js" charset="utf-8"></script>
   <script src="docs/assets/jquery.min.js"></script>
-  <script src="/browser/deps.js"></script>
+  <script src="/browser/knex.js"></script>
   <script src="/browser/bookshelf.js"></script>
 
   <script>
@@ -2703,7 +2778,7 @@ user.fetch({withRelated: ['accounts', {
   });
   hljs.initHighlightingOnLoad();
 
-  var knex = require('knex')({client: 'websql'});
+  var knex = Knex({client: 'websql'});
   var bookshelf = Bookshelf(knex);
 
   // Don't show the full change log.
